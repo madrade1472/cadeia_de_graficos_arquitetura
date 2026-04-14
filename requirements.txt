@@ -1,0 +1,2 @@
+# Opcional: necessario apenas para processar arquivos .yaml/.yml
+pyyaml>=6.0.1

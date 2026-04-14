@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualizador de Arquitetura</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0e17;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ─────────────────────────────────── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 1.25rem;
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+      flex-shrink: 0;
+    }
+    #topbar .title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #topbar .proj-name {
+      color: #4578a0;
+      font-weight: 400;
+      font-size: 0.82rem;
+    }
+    .controls {
+      display: flex;
+      gap: 0.4rem;
+      margin-left: auto;
+    }
+    .btn {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 0 0.85rem;
+      height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #21262d; color: #e6edf3; }
+    .btn.primary {
+      background: #1d3557;
+      border-color: #4578a0;
+      color: #7db9e8;
+    }
+    .btn.primary:hover { background: #243f6a; }
+
+    /* ── Main area ──────────────────────────────── */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Upload panel (initial state) ──────────── */
+    #upload-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem;
+    }
+    #drop-zone {
+      width: 100%;
+      max-width: 520px;
+      border: 2px dashed #30363d;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #4578a0;
+      background: #0d111788;
+    }
+    #drop-zone svg { opacity: 0.4; margin-bottom: 1rem; }
+    #drop-zone p { color: #8b949e; font-size: 0.9rem; line-height: 1.6; }
+    #drop-zone strong { color: #e6edf3; }
+
+    .or-divider {
+      color: #30363d;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 520px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid #30363d;
+    }
+
+    #json-paste {
+      width: 100%;
+      max-width: 520px;
+      height: 160px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-family: 'Consolas', monospace;
+      font-size: 0.8rem;
+      padding: 0.85rem;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+    #json-paste:focus { outline: none; border-color: #4578a0; }
+    #json-paste::placeholder { color: #30363d; }
+
+    #error-msg {
+      color: #f08080;
+      font-size: 0.82rem;
+      display: none;
+    }
+
+    /* ── Cytoscape canvas ───────────────────────── */
+    #cy-wrap {
+      flex: 1;
+      position: relative;
+      display: none;
+    }
+    #cy { width: 100%; height: 100%; }
+
+    /* ── Tooltip ────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.8rem;
+      color: #e6edf3;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      max-width: 220px;
+    }
+    #tooltip .tt-title { font-weight: 700; margin-bottom: 0.2rem; }
+    #tooltip .tt-tech  { color: #8b949e; font-size: 0.75rem; }
+    #tooltip .tt-desc  { color: #aac4e0; font-size: 0.75rem; margin-top: 0.2rem; line-height: 1.4; }
+
+    /* ── Legend ─────────────────────────────────── */
+    #legend {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      background: #0d111799;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.75rem;
+      color: #8b949e;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      backdrop-filter: blur(4px);
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+    .legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-line { width: 20px; height: 2px; flex-shrink: 0; }
+
+    /* ── File input hidden ──────────────────────── */
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4578a0" stroke-width="2.2">
+    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+  </svg>
+  <div class="title">
+    Visualizador de Arquitetura
+    <span class="proj-name" id="proj-name"></span>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-fit" style="display:none">⊞ Ajustar</button>
+    <button class="btn" id="btn-zoomin" style="display:none">+ Zoom</button>
+    <button class="btn" id="btn-zoomout" style="display:none">− Zoom</button>
+    <button class="btn primary" id="btn-load-new" style="display:none">Carregar outro JSON</button>
+    <button class="btn primary" id="btn-open-file">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Abrir JSON
+    </button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- Upload panel -->
+  <div id="upload-panel">
+    <div id="drop-zone">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+      </svg>
+      <p><strong>Arraste um arquivo JSON aqui</strong><br>ou clique para selecionar</p>
+    </div>
+
+    <div class="or-divider">ou cole o JSON abaixo</div>
+
+    <textarea id="json-paste" placeholder='{"project_name": "Meu Projeto", "nodes": [...], "edges": [...]}'></textarea>
+
+    <span id="error-msg"></span>
+
+    <button class="btn primary" id="btn-render" style="padding: 0 1.5rem; height:38px; font-size:0.9rem">
+      Renderizar Grafo
+    </button>
+  </div>
+
+  <!-- Cytoscape canvas -->
+  <div id="cy-wrap">
+    <div id="cy"></div>
+    <div id="tooltip">
+      <div class="tt-title" id="tt-title"></div>
+      <div class="tt-tech"  id="tt-tech"></div>
+      <div class="tt-desc"  id="tt-desc"></div>
+    </div>
+    <div id="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#4578a0"></div> Camada
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0a0e17;border:1.5px solid #4578a0"></div> Componente
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:#4578a0;height:3px"></div> Fluxo entre camadas
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:#4578a0;height:2px"></div> Conexao entre componentes
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:transparent;border-top:1px dashed #4578a066;height:0"></div> Pertence a camada
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".json" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+
+<script>
+  let cyInstance = null;
+
+  // ── Cytoscape styles ─────────────────────────────────────────────────
+  const CY_STYLE = [
+    {
+      selector: '.layer-node',
+      style: {
+        label: 'data(label)',
+        shape: 'round-rectangle',
+        'background-color': 'data(color)',
+        'background-opacity': 0.9,
+        'border-width': 0,
+        color: '#ffffff',
+        'font-size': '13px',
+        'font-weight': 'bold',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'text-max-width': '140px',
+        width: '160px',
+        height: '48px',
+        padding: '10px',
+      },
+    },
+    {
+      selector: '.comp-node',
+      style: {
+        label: 'data(label)',
+        shape: 'round-rectangle',
+        'background-color': '#0a0e17',
+        'background-opacity': 1,
+        'border-width': 1.5,
+        'border-color': 'data(color)',
+        color: '#e6edf3',
+        'font-size': '11px',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'text-max-width': '110px',
+        width: '130px',
+        height: '38px',
+      },
+    },
+    {
+      selector: '.flow-edge',
+      style: {
+        'line-color': 'data(color)',
+        'target-arrow-color': 'data(color)',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1.3,
+        width: 3,
+        'curve-style': 'bezier',
+        opacity: 0.9,
+      },
+    },
+    {
+      selector: '.comp-flow-edge',
+      style: {
+        'line-color': 'data(color)',
+        'target-arrow-color': 'data(color)',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1.0,
+        width: 1.8,
+        'curve-style': 'bezier',
+        opacity: 0.75,
+      },
+    },
+    {
+      selector: '.member-edge',
+      style: {
+        'line-color': 'data(color)',
+        'target-arrow-shape': 'none',
+        width: 1,
+        'line-style': 'dashed',
+        'line-dash-pattern': [5, 5],
+        'curve-style': 'bezier',
+        opacity: 0.30,
+      },
+    },
+    {
+      selector: 'node.hovered',
+      style: {
+        'overlay-opacity': 0.15,
+        'overlay-color': '#ffffff',
+      },
+    },
+  ];
+
+  // ── Render ───────────────────────────────────────────────────────────
+  function render(graphData) {
+    document.getElementById('upload-panel').style.display = 'none';
+    document.getElementById('cy-wrap').style.display = 'block';
+    document.getElementById('proj-name').textContent =
+      graphData.project_name ? '— ' + graphData.project_name : '';
+
+    // topbar controls
+    ['btn-fit','btn-zoomin','btn-zoomout','btn-load-new'].forEach(id => {
+      document.getElementById(id).style.display = '';
+    });
+    document.getElementById('btn-open-file').style.display = 'none';
+
+    if (cyInstance) { cyInstance.destroy(); cyInstance = null; }
+
+    cyInstance = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [...graphData.nodes, ...graphData.edges],
+      style: CY_STYLE,
+      layout: {
+        name: 'dagre',
+        rankDir: 'LR',
+        nodeSep: 40,
+        edgeSep: 20,
+        rankSep: 110,
+        padding: 50,
+        fit: true,
+        animate: true,
+        animationDuration: 450,
+      },
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+      boxSelectionEnabled: false,
+      minZoom: 0.1,
+      maxZoom: 4,
+    });
+
+    // Tooltip
+    const tooltip  = document.getElementById('tooltip');
+    const ttTitle  = document.getElementById('tt-title');
+    const ttTech   = document.getElementById('tt-tech');
+    const ttDesc   = document.getElementById('tt-desc');
+
+    cyInstance.on('mouseover', 'node', e => {
+      const d = e.target.data();
+      ttTitle.textContent = d.label || '';
+      ttTech.textContent  = d.tech ? '\u2699 ' + d.tech : '';
+      ttDesc.textContent  = d.description || '';
+      ttDesc.style.display = d.description ? '' : 'none';
+      tooltip.style.display = 'block';
+      e.target.addClass('hovered');
+    });
+
+    cyInstance.on('mousemove', 'node', e => {
+      const pos  = e.renderedPosition;
+      const rect = document.getElementById('cy-wrap').getBoundingClientRect();
+      let x = pos.x + 14, y = pos.y + 10;
+      if (x + 230 > rect.width)  x = pos.x - 234;
+      if (y + 100 > rect.height) y = pos.y - 104;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top  = y + 'px';
+    });
+
+    cyInstance.on('mouseout', 'node', e => {
+      tooltip.style.display = 'none';
+      e.target.removeClass('hovered');
+    });
+  }
+
+  // ── Load JSON string ─────────────────────────────────────────────────
+  function loadJson(text) {
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'none';
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      errEl.textContent = 'JSON invalido: ' + e.message;
+      errEl.style.display = 'block';
+      return;
+    }
+    if (!data.nodes || !data.edges) {
+      errEl.textContent = 'O JSON precisa ter os campos "nodes" e "edges".';
+      errEl.style.display = 'block';
+      return;
+    }
+    render(data);
+  }
+
+  // ── File input ───────────────────────────────────────────────────────
+  const fileInput = document.getElementById('file-input');
+
+  document.getElementById('btn-open-file').addEventListener('click', () => fileInput.click());
+  document.getElementById('drop-zone').addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => loadJson(ev.target.result);
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+
+  // ── Drag and drop ────────────────────────────────────────────────────
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => loadJson(ev.target.result);
+    reader.readAsText(file);
+  });
+
+  // ── Paste + render button ────────────────────────────────────────────
+  document.getElementById('btn-render').addEventListener('click', () => {
+    loadJson(document.getElementById('json-paste').value.trim());
+  });
+
+  // ── Zoom / fit controls ──────────────────────────────────────────────
+  document.getElementById('btn-fit').addEventListener('click', () => cyInstance?.fit(undefined, 50));
+  document.getElementById('btn-zoomin').addEventListener('click', () => {
+    if (!cyInstance) return;
+    cyInstance.zoom({ level: cyInstance.zoom() * 1.25,
+      renderedPosition: { x: cyInstance.width() / 2, y: cyInstance.height() / 2 } });
+  });
+  document.getElementById('btn-zoomout').addEventListener('click', () => {
+    if (!cyInstance) return;
+    cyInstance.zoom({ level: cyInstance.zoom() * 0.8,
+      renderedPosition: { x: cyInstance.width() / 2, y: cyInstance.height() / 2 } });
+  });
+
+  // ── Load new ─────────────────────────────────────────────────────────
+  document.getElementById('btn-load-new').addEventListener('click', () => {
+    document.getElementById('cy-wrap').style.display = 'none';
+    document.getElementById('upload-panel').style.display = 'flex';
+    document.getElementById('proj-name').textContent = '';
+    document.getElementById('json-paste').value = '';
+    document.getElementById('error-msg').style.display = 'none';
+    ['btn-fit','btn-zoomin','btn-zoomout','btn-load-new'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    document.getElementById('btn-open-file').style.display = '';
+    if (cyInstance) { cyInstance.destroy(); cyInstance = null; }
+  });
+
+  // ── Auto-load from URL param ?json=<url> ─────────────────────────────
+  const params = new URLSearchParams(window.location.search);
+  const jsonUrl = params.get('json');
+  if (jsonUrl) {
+    fetch(jsonUrl)
+      .then(r => r.text())
+      .then(loadJson)
+      .catch(e => {
+        document.getElementById('error-msg').textContent = 'Falha ao carregar: ' + e.message;
+        document.getElementById('error-msg').style.display = 'block';
+      });
+  }
+</script>
+</body>
+</html>

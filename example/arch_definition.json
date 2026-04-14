@@ -1,0 +1,131 @@
+{
+  "project_name": "Plataforma E-commerce",
+  "layers": [
+    {
+      "id": "layer_ui",
+      "name": "Interface & Apresentacao",
+      "description": "Camada de frontend e experiencia do usuario",
+      "color": "#2563eb",
+      "components": [
+        {
+          "name": "App Web",
+          "tech": "React",
+          "type": "ui",
+          "description": "Frontend principal SPA",
+          "connections_to": ["API Gateway"]
+        },
+        {
+          "name": "App Mobile",
+          "tech": "React Native",
+          "type": "ui",
+          "description": "Aplicativo iOS e Android",
+          "connections_to": ["API Gateway"]
+        }
+      ],
+      "connections_to": ["layer_api"]
+    },
+    {
+      "id": "layer_api",
+      "name": "API & Servicos",
+      "description": "Camada de orquestracao e regras de negocio",
+      "color": "#9333ea",
+      "components": [
+        {
+          "name": "API Gateway",
+          "tech": "Kong",
+          "type": "api",
+          "description": "Ponto unico de entrada, autenticacao e rate limit",
+          "connections_to": ["Servico de Pedidos", "Servico de Produtos", "Servico de Usuarios"]
+        },
+        {
+          "name": "Servico de Pedidos",
+          "tech": "Node.js",
+          "type": "process",
+          "description": "Gerencia ciclo de vida dos pedidos",
+          "connections_to": ["Banco de Pedidos", "Fila de Eventos"]
+        },
+        {
+          "name": "Servico de Produtos",
+          "tech": "Python FastAPI",
+          "type": "process",
+          "description": "Catalogo, estoque e precos",
+          "connections_to": ["Banco de Produtos", "Cache Redis"]
+        },
+        {
+          "name": "Servico de Usuarios",
+          "tech": "Go",
+          "type": "process",
+          "description": "Autenticacao, perfis e permissoes",
+          "connections_to": ["Banco de Usuarios"]
+        }
+      ],
+      "connections_to": ["layer_data"]
+    },
+    {
+      "id": "layer_data",
+      "name": "Dados & Mensageria",
+      "description": "Persistencia, cache e comunicacao assincrona",
+      "color": "#16a34a",
+      "components": [
+        {
+          "name": "Banco de Pedidos",
+          "tech": "PostgreSQL",
+          "type": "store",
+          "description": "Transacoes e historico de pedidos"
+        },
+        {
+          "name": "Banco de Produtos",
+          "tech": "MongoDB",
+          "type": "store",
+          "description": "Catalogo flexivel de produtos"
+        },
+        {
+          "name": "Banco de Usuarios",
+          "tech": "PostgreSQL",
+          "type": "store",
+          "description": "Dados e credenciais de usuarios"
+        },
+        {
+          "name": "Cache Redis",
+          "tech": "Redis",
+          "type": "store",
+          "description": "Cache de sessoes e produtos frequentes"
+        },
+        {
+          "name": "Fila de Eventos",
+          "tech": "Kafka",
+          "type": "source",
+          "description": "Stream de eventos para processamento assincrono",
+          "connections_to": ["Servico de Notificacao"]
+        }
+      ],
+      "connections_to": ["layer_infra"]
+    },
+    {
+      "id": "layer_infra",
+      "name": "Infra & Observabilidade",
+      "description": "Infraestrutura, monitoramento e notificacoes",
+      "color": "#ea580c",
+      "components": [
+        {
+          "name": "Servico de Notificacao",
+          "tech": "Node.js",
+          "type": "process",
+          "description": "Envia emails, SMS e push notifications"
+        },
+        {
+          "name": "Monitoramento",
+          "tech": "Grafana + Prometheus",
+          "type": "infra",
+          "description": "Metricas, alertas e dashboards"
+        },
+        {
+          "name": "Kubernetes",
+          "tech": "GKE",
+          "type": "infra",
+          "description": "Orquestracao de containers em producao"
+        }
+      ]
+    }
+  ]
+}
